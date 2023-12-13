@@ -230,10 +230,11 @@ def get_pivot(data, pricelist):
         if piv.loc["D. Danielsen AS"]["Totalt antall paller"] < 10:
             piv.loc["D. Danielsen AS"]["Totalt antall paller"] = 10
 
-
     # Legg til prisliste
-    piv = piv.merge(pricelist, how='left',on='Kundenavn')
+    piv = piv.merge(pricelist[["Kundenavn", "Pris"]], how='left',on='Kundenavn')
     piv["Total pris"] = piv["Totalt antall paller"] * piv["Pris"]
+
+    
 
     ####################################################################################
     # Kosmetikk
@@ -297,11 +298,11 @@ def write_cars_to_excel(writer, workbook, formats, piv, type):
 
     return None 
 
-
 def write_to_excel(writer, workbook, formats, piv, gas, df_TCO):
     sname = "Oppsummering"
     worksheet=workbook.add_worksheet(sname)
     writer.sheets[sname] = worksheet
+
 
     worksheet.write_string(0, 0, "Leveranserapport - uke "+str(uke), formats[0])
     worksheet.write_string(2, 0, "Palleoversikt", formats[1])
@@ -383,7 +384,7 @@ if __name__ == "__main__":
                 worksheet,writer = write_to_excel(writer, workbook, formats, piv, gas, df_TCO)  
             
         df_sum = get_df_sum(df_TCO, transporter, bidrag, total_pris) 
-        write_sum_to_excel(writer,  worksheet, formats, df_sum)           
+        #write_sum_to_excel(writer,  worksheet, formats, df_sum)           
                 
         # Lukk og lagre fil 
         writer.close()
