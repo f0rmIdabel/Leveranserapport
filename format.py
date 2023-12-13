@@ -16,7 +16,8 @@ def read_infile():
 
     # Hent innfil-mappen
     files = os.listdir('innfil/')
-
+    if ".gitkeep" in files:
+        files.remove(".gitkeep")
     # Sjekk at det kun ligger en fil i mappen
     if len(files) > 1:
         print(files)
@@ -134,7 +135,7 @@ def extract_relevant_columns(df):
                              df['Ant paller TM'] +  df['Ant paller RDI']
 
     # Legg til kolonne for Termobil
-    df["Tørr"] = ["TERMO" in str(tur).upper() for tur in df["Turnavn"]]
+    df = categorise_route(df)
 
     # Legg til kolonner for ukedag
     df["Dato"] = pd.to_datetime(df["Leveringsdato"])
@@ -147,9 +148,20 @@ def extract_relevant_columns(df):
     df = df.drop_duplicates().reset_index(drop=True)
 
     # Velg relevante kolonner
-    df = df[['Transportør', 'Kundenavn', "Tørr",
+    df = df[['Transportør', 'Kundenavn', "Turtype",
              'Dato', 'Ukedag', 'Ukedag navn',
              'Ant paller summert']]
+    return df
+
+def categorise_route(df):
+
+    termo = ["TERMO" in str(tur).upper() for tur in df["Turnavn"]]
+    fastpris = [" RUTE " in str(tur).upper() for tur in df["Turnavn"]]
+    df["Turtype"] = ["Termobil" if t 
+                     else "BIL " +df.loc[i,"Turnavn"].split()[-1] if f 
+                     else "Pallepris" 
+                     for t,f, i in zip(termo, fastpris, range(len(df)))]
+
     return df
 
 def get_median_week(df):
@@ -188,17 +200,18 @@ def get_df_TCO(gas, transporter):
     
     return df_TCO
 
-def get_df_sum(df_TCO, transporter, total_pris):
+def get_df_sum(df_TCO, transporter, bidrag, total_pris):
+
+    bidrag.append("T&M")
+    total_pris.append(transporter["TM"].iloc[0])
+    bidrag.append("Samlet drivstofftillegg") 
+    drivstofftillegg = np.sum(np.asarray(total_pris)*float(df_TCO["Økning i TCO (%)"].iloc[0])/100)
+    total_pris.append(drivstofftillegg)
     df_sum = pd.DataFrame()
-    df_sum["Bidrag"] = ["Paller", \
-                        "T&M", \
-                        "Drivstofftillegg, " + str(round(float(df_TCO["Økning i TCO (%)"].iloc[0]),1)) + " %"]
-    
-    df_sum["Pris (kr)"] = [float(total_pris), \
-                            float(transporter["TM"].iloc[0]), \
-                            (float(total_pris)+float(transporter["TM"].iloc[0]))\
-                            *float(df_TCO["Økning i TCO (%)"].iloc[0])/100]
-    
+    df_sum["Bidrag"] = bidrag
+    df_sum["Pris (kr)"] = total_pris
+    df_sum["Drivstofftillegg, " + str(round(float(df_TCO["Økning i TCO (%)"].iloc[0]),1)) + " %"] = df_sum["Pris (kr)"]*float(df_TCO["Økning i TCO (%)"].iloc[0])/100
+
     return df_sum
 
 def get_pivot(data, pricelist):
@@ -256,7 +269,7 @@ def init_workbook(transporter, week, raw):
     return writer, workbook, [format_header, format_header2, format_sum]
 
 def write_termo_to_excel(writer, workbook, formats, piv):
-    sname = "Oppsummering - Termobil"
+    sname = "Termobil"
 
     worksheet=workbook.add_worksheet(sname)
     writer.sheets[sname] = worksheet
@@ -269,7 +282,23 @@ def write_termo_to_excel(writer, workbook, formats, piv):
 
     return None 
 
-def write_to_excel(writer, workbook, formats, piv, gas, df_TCO, df_sum):
+def write_cars_to_excel(writer, workbook, formats, piv, type):
+    
+    sname = type
+
+    worksheet=workbook.add_worksheet(sname)
+    writer.sheets[sname] = worksheet
+
+    worksheet.write_string(0, 0, "Leveranserapport - uke "+str(uke), formats[0])
+    worksheet.write_string(2, 0, "Palleoversikt", formats[1])
+
+    piv = piv[piv.columns[:-2]]
+    piv.sort_values(by=['Kundenavn']).to_excel(writer,sheet_name=sname,startrow=4 , startcol=0, index=False)
+
+    return None 
+
+
+def write_to_excel(writer, workbook, formats, piv, gas, df_TCO):
     sname = "Oppsummering"
     worksheet=workbook.add_worksheet(sname)
     writer.sheets[sname] = worksheet
@@ -284,17 +313,18 @@ def write_to_excel(writer, workbook, formats, piv, gas, df_TCO, df_sum):
     worksheet.write_string(piv.shape[0] + 13, 0, "Drivstofftillegg", formats[1])
     df_TCO.round(3).to_excel(writer,sheet_name=sname,startcol=0, startrow=piv.shape[0] + 15, index=False)
 
-    worksheet.write_string(2, piv.shape[1] + 2, "Endelig sum", formats[0])
-    df_sum.round(2).to_excel(writer,sheet_name=sname,startcol=piv.shape[1] + 2, startrow=4, index=False)
+    return worksheet, writer 
+
+def write_sum_to_excel(writer, worksheet, formats, df_sum):
+    sname = "Oppsummering"
+
+    worksheet.write_string(2, 11 + 2, "Endelig sum", formats[0])
+    df_sum.round(2).to_excel(writer,sheet_name=sname,startcol=11 + 2, startrow=4, index=False)
     
     total_sum = df_sum["Pris (kr)"].sum()
-    worksheet.write_string(8, piv.shape[1] + 3, str(round(total_sum,2)), formats[2])
+    worksheet.write_string(8+12, 11 + 3, str(round(total_sum,2)), formats[2])
 
     return None
-
-def write_cars_to_excel():
-    # Nedenes RUTE 4 
-    return None 
 
 if __name__ == "__main__":
 
@@ -308,6 +338,7 @@ if __name__ == "__main__":
     gas = get_gas_price()
     pricelist = get_customer_pricelist() 
     transporters = get_input("Transportører")
+    cars = get_input("Biler")
 
     for t in transporters["Transportør"].unique():
 
@@ -320,8 +351,11 @@ if __name__ == "__main__":
         # Håndter pallepriser, tørrbil og fastpris-biler separat 
         ####################################################################################
 
-        for b in [False, True]:
-            data_transporter_ = data_transporter[data_transporter["Tørr"]==b]
+        total_pris = []
+        bidrag = []
+
+        for type in data_transporter["Turtype"].unique():
+            data_transporter_ = data_transporter[data_transporter["Turtype"]==type]
 
             if len(data_transporter_) == 0:
                 continue
@@ -330,15 +364,26 @@ if __name__ == "__main__":
             piv = get_pivot(data_transporter_, pricelist)
 
             # Skriv til excel
-            if b:
+            if type == "Termobil":
                 write_termo_to_excel(writer, workbook, formats, piv)
 
-            if not b:
-                df_TCO = get_df_TCO(gas, transporter)
-                total_pris = piv.iat[-1,-1]
-                df_sum = get_df_sum(df_TCO, transporter, total_pris)            
+ 
+            elif type[:3] == "BIL":
+                write_cars_to_excel(writer, workbook, formats, piv, type)
+                bidrag.append(type)
+                total_pris.append(cars[cars["Bil"]==int(type[4:])]["Pris"].iloc[0])
                 
-                write_to_excel(writer, workbook, formats, piv, gas, df_TCO, df_sum)  
+
+            elif type == "Pallepris":
+                bidrag.append("Paller")
+                total_pris_paller = piv.iat[-1,-1]
+                total_pris.append(total_pris_paller)
+                df_TCO = get_df_TCO(gas, transporter)
+                
+                worksheet,writer = write_to_excel(writer, workbook, formats, piv, gas, df_TCO)  
+            
+        df_sum = get_df_sum(df_TCO, transporter, bidrag, total_pris) 
+        write_sum_to_excel(writer,  worksheet, formats, df_sum)           
                 
         # Lukk og lagre fil 
         writer.close()
