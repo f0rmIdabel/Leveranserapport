@@ -11,6 +11,7 @@ Transformerer den ukentlige leveranserapporten, slik at dataen splittes og oppsu
  ```
 2. Oppdater variablen PATH i etl.py
 3. Legg inn ukens leveranserapport i mappen innfil. 
+4. Legg til input-filen prisliste.xlsx.
 4. Kjør etl.py
 
 ## Videreutvikling
