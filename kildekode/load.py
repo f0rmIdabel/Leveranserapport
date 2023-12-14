@@ -1,8 +1,11 @@
 # load.py
 import pandas as pd
 
-def init_workbook(transporter, week, raw):
-    writer = pd.ExcelWriter('../utfil/' + transporter + ' - uke ' + str(week) + '.xlsx', engine='xlsxwriter')
+def init_workbook(transporter, week, raw, path):
+    """
+    Initialiserer excel-fil for transportøren.
+    """
+    writer = pd.ExcelWriter(path+'utfil/' + transporter + ' - uke ' + str(week) + '.xlsx', engine='xlsxwriter')
     workbook=writer.book
     # Spesifiser format
     format_header = workbook.add_format({'bold': True, 'font_size': 18})
@@ -16,6 +19,9 @@ def init_workbook(transporter, week, raw):
     return writer, workbook, [format_header, format_header2, format_sum]
 
 def write_pivot_to_excel(writer, workbook, formats, piv, sheetname, uke):
+    """
+    Skriver pivot-tabellen til excel-filen.
+    """
     
     worksheet=workbook.add_worksheet(sheetname)
     writer.sheets[sheetname] = worksheet
@@ -29,6 +35,9 @@ def write_pivot_to_excel(writer, workbook, formats, piv, sheetname, uke):
     return None 
 
 def write_summary_to_excel(writer, workbook, formats, piv, gas, df_TCO, uke):
+    """
+    Skriv oppsummeringsinfo til excel-filen.
+    """
     sname = "Oppsummering"
     worksheet=workbook.add_worksheet(sname)
     writer.sheets[sname] = worksheet
@@ -46,6 +55,9 @@ def write_summary_to_excel(writer, workbook, formats, piv, gas, df_TCO, uke):
     return worksheet, writer 
 
 def write_sum_to_excel(writer, worksheet, formats, df_sum):
+    """
+    Skriv totalsummen til excel-filen.
+    """
     sname = "Oppsummering"
 
     worksheet.write_string(2, 11 + 2, "Endelig sum", formats[0])
@@ -59,7 +71,7 @@ def write_sum_to_excel(writer, worksheet, formats, df_sum):
     worksheet.write_string(5+df_sum.shape[0], 11 + 2, "SUM", formats[1])
     return None
 
-def append_to_yearly_logfile(df):
+def append_to_yearly_logfile(df, path):
     """
     Legg til rådata i loggfilen. 
     Hvert år har sin egen fil, og filen 
@@ -73,12 +85,12 @@ def append_to_yearly_logfile(df):
     # Legg til rådata i loggfilen per år
     for year in years:
         try:
-            logfile = pd.read_excel("../loggfil/Leveranserapport - " + str(year) + ".xlsx")
+            logfile = pd.read_excel(path+"loggfil/Leveranserapport - " + str(year) + ".xlsx")
             #logfile = logfile.append(raw[raw["Years"]==year])  deprecated 
             logfile = pd.concat([logfile, df[df["Years"]==year]], ignore_index=True)
             logfile = logfile.drop_duplicates()
-            logfile.to_excel("../loggfil/Leveranserapport - " + str(year) + ".xlsx", index=False)
+            logfile.to_excel(path+"loggfil/Leveranserapport - " + str(year) + ".xlsx", index=False)
         except FileNotFoundError:
-            df[df["Years"]==year].to_excel("../loggfil/Leveranserapport - " + str(year) + ".xlsx", index=False)
+            df[df["Years"]==year].to_excel(path+"loggfil/Leveranserapport - " + str(year) + ".xlsx", index=False)
 
     return None

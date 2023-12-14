@@ -85,7 +85,11 @@ def extract_relevant_columns(df):
     return df
 
 def categorise_route(df):
-
+    """
+    Kategoriserer ruter i Termobil, Pallepris og Fastpris-ruter.
+    Termobil og fastpriss-ruter defineres ut fra navnet på ruta.
+    Resten antas å være pallepris-ruter.
+    """
     termo = ["TERMO" in str(tur).upper() for tur in df["Turnavn"]]
     fastpris = [" RUTE " in str(tur).upper() for tur in df["Turnavn"]]
     df["Turtype"] = ["Termobil" if t 
@@ -96,6 +100,10 @@ def categorise_route(df):
     return df
 
 def get_df_TCO(gas, transporter, uke):
+    """
+    Regn ut økning i TCO for transportøren.
+    Basert på inputfilen.
+    """
     df_TCO = pd.DataFrame()
     df_TCO["Prisøkning (kr/liter)"] = gas["Snitt uke "+str(uke)] - gas[gas.columns[0]]
     df_TCO["Prisøkning (%)"] = df_TCO["Prisøkning (kr/liter)"] / gas[gas.columns[0]] *100
@@ -105,7 +113,9 @@ def get_df_TCO(gas, transporter, uke):
     return df_TCO
 
 def get_df_sum(df_TCO, transporter, bidrag, total_pris):
-
+    """
+    Regn ut totalsummen for transportøren.
+    """
     if transporter["TM"].iloc[0] > 0:
         bidrag.append("T&M")
         total_pris.append(transporter["TM"].iloc[0])
@@ -117,6 +127,9 @@ def get_df_sum(df_TCO, transporter, bidrag, total_pris):
     return df_sum
 
 def get_pivot(data, pricelist):
+    """
+    Lag pivot-tabell for transportøren.
+    """
     # Lag pivot-tabell med kunder og leveringsdag
     piv = pd.pivot_table(data, aggfunc='sum',\
                         values='Ant paller summert', columns='Ukedag navn', index='Kundenavn')\
@@ -158,6 +171,9 @@ def get_pivot(data, pricelist):
     return piv 
 
 def get_turtype_sorted(data):
+    """
+    Sorter turtypene i riktig rekkefølge.
+    """
 
     turtype_sorted = []
     turtype = data["Turtype"].unique()
